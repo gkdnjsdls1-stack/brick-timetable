@@ -1,5 +1,8 @@
 name: Deploy to GitHub Pages
 
+# 저장소 Settings -> Pages -> Source 를 "GitHub Actions" 로 고르면
+# 이 워크플로가 알아서 배포한다. 그 다음부터는 push 할 때마다 자동.
+
 on:
   push:
     branches: [main]
@@ -22,15 +25,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-
-      # Pages가 아직 꺼져 있으면 여기서 켠다 (enablement)
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
-
       - id: deployment
         uses: actions/deploy-pages@v4
