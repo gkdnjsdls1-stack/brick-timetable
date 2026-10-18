@@ -210,6 +210,8 @@ button{cursor:pointer}
   background-size:calc(100% / var(--n,1)) 100%;
 }
 .seg.nowcell{outline:2px solid var(--red);outline-offset:-2px}
+.seg.future{background:transparent;box-shadow:inset 0 0 0 1px var(--stud);cursor:default}
+.seg.future::after{opacity:.35}
 .seg.on{
   background:var(--c);
   box-shadow:inset 0 -4px 0 rgba(0,0,0,.22), inset 0 3px 0 rgba(255,255,255,.22);
@@ -665,46 +667,90 @@ function hexRgb(h){
   if(h.length===3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
   return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];
 }
+/* 단계마다 비율이 다르다.
+   아기: 머리가 크고 몸이 작으며 눈이 크다
+   청소년: 균형 잡힌 비율
+   어른: 머리가 작아지고 몸통이 넓어지며 다리가 길어진다 */
+var SHAPE = {
+  baby:  {hx:3, hy:3, hw:10, hh:8, bx:6, by:11, bw:4, bh:3,
+          legY:0,  footY:14, footX:[6,8], eyeX:[5,9], eyeY:6, eyeH:3, muzY:9},
+  teen:  {hx:4, hy:3, hw:8,  hh:7, bx:5, by:10, bw:6, bh:5,
+          legY:0,  footY:15, footX:[5,9], eyeX:[5,9], eyeY:6, eyeH:2, muzY:8},
+  adult: {hx:4, hy:3, hw:8,  hh:6, bx:4, by:9,  bw:8, bh:4,
+          legY:13, footY:15, footX:[4,10], eyeX:[5,9], eyeY:5, eyeH:2, muzY:7}
+};
+
 function drawBody(g, sp, stageId, M){
   function p(x,y,w,h,c){ g.fillStyle=c; g.fillRect(M+x,M+y,w,h); }
   var body=sp.body, belly=sp.belly, dark=sp.dark;
+  var S = SHAPE[stageId] || SHAPE.teen;
+  var hx=S.hx, hy=S.hy, hw=S.hw, hh=S.hh;
+  var bx=S.bx, by=S.by, bw=S.bw, bh=S.bh;
+  var eL=hx, eR=hx+hw-3;
 
-  if(sp.tail==="curl"){ p(11,11,2,1,body); p(12,10,1,1,body); }
-  if(sp.tail==="puff"){ p(11,11,3,3,belly); }
-  if(sp.tail==="big"){ p(11,9,4,5,body); if(sp.tailTip) p(12,9,3,2,sp.tailTip); }
+  /* 꼬리 — 몸통 오른쪽에 붙는다 */
+  if(sp.tail==="curl"){ p(bx+bw, by+1, 2, 1, body); p(bx+bw+1, by, 1, 1, body); }
+  if(sp.tail==="puff"){ p(bx+bw, by+bh-2, 3, 3, belly); }
+  if(sp.tail==="big"){
+    p(bx+bw, by-1, 3, bh+1, body);
+    if(sp.tailTip) p(bx+bw+1, by-1, 2, 2, sp.tailTip);
+  }
 
-  p(5,10,6,5,body);          /* 몸통 */
-  p(6,11,4,4,belly);         /* 배 */
-  p(5,15,2,1,dark); p(9,15,2,1,dark);   /* 발 */
+  /* 몸통과 다리 */
+  p(bx, by, bw, bh, body);
+  p(bx+1, by+1, bw-2, bh-1, belly);
+  if(S.legY){                                   /* 어른만 긴 다리 */
+    p(S.footX[0], S.legY, 2, S.footY-S.legY, body);
+    p(S.footX[1], S.legY, 2, S.footY-S.legY, body);
+  }
+  p(S.footX[0], S.footY, 2, 1, dark);
+  p(S.footX[1], S.footY, 2, 1, dark);
 
-  p(4,3,8,7,body);           /* 머리 */
-  p(5,2,6,1,body);
+  /* 머리 */
+  p(hx, hy, hw, hh, body);
+  p(hx+1, hy-1, hw-2, 1, body);
 
+  /* 귀 */
   if(sp.ear==="tri"){
-    p(5,1,1,2,body); p(4,2,3,1,body); p(10,1,1,2,body); p(9,2,3,1,body);
-    if(sp.inner){ p(5,2,1,1,sp.inner); p(10,2,1,1,sp.inner); }
+    p(eL+1, hy-2, 1, 2, body); p(eL, hy-1, 3, 1, body);
+    p(eR+1, hy-2, 1, 2, body); p(eR, hy-1, 3, 1, body);
+    if(sp.inner){ p(eL+1, hy-1, 1, 1, sp.inner); p(eR+1, hy-1, 1, 1, sp.inner); }
   }
   if(sp.ear==="long"){
-    p(4,0,2,4,body); p(10,0,2,4,body);
-    if(sp.inner){ p(4,1,1,2,sp.inner); p(11,1,1,2,sp.inner); }
+    p(eL, hy-4, 2, 4, body); p(eR+1, hy-4, 2, 4, body);
+    if(sp.inner){ p(eL, hy-3, 1, 2, sp.inner); p(eR+2, hy-3, 1, 2, sp.inner); }
   }
-  if(sp.ear==="round"){ p(3,2,3,3,sp.earColor||dark); p(10,2,3,3,sp.earColor||dark); }
-  if(sp.ear==="floppy"){ p(3,4,2,5,sp.earColor||dark); p(11,4,2,5,sp.earColor||dark); }
-  if(sp.spikes){ p(6,1,1,1,dark); p(8,0,1,2,dark); p(10,1,1,1,dark); }
+  if(sp.ear==="round"){
+    p(hx-1, hy-1, 3, 3, sp.earColor||dark); p(hx+hw-2, hy-1, 3, 3, sp.earColor||dark);
+  }
+  if(sp.ear==="floppy"){
+    p(hx-2, hy+2, 2, hh-2, sp.earColor||dark); p(hx+hw, hy+2, 2, hh-2, sp.earColor||dark);
+  }
+  if(sp.spikes){
+    p(hx+2, hy-2, 1, 2, dark); p(hx+hw-3, hy-2, 1, 2, dark);
+    p(hx+Math.floor(hw/2), hy-3, 1, 3, dark);
+  }
 
-  if(sp.face) p(5,5,6,5,sp.face);
-  if(sp.patch){ p(4,5,3,3,sp.patch); p(9,5,3,3,sp.patch); }
+  /* 얼굴 */
+  var eX=S.eyeX, eY=S.eyeY, eH=S.eyeH;
+  if(sp.face) p(eX[0], eY-1, eX[1]-eX[0]+2, S.muzY-eY+2, sp.face);
+  if(sp.patch){ p(eX[0]-1, eY-1, 3, eH+2, sp.patch); p(eX[1]-1, eY-1, 3, eH+2, sp.patch); }
 
   if(sp.patch){
-    p(5,6,2,2,"#ffffff"); p(9,6,2,2,"#ffffff");
-    p(5,7,1,1,"#2a2320");  p(10,7,1,1,"#2a2320");
+    p(eX[0], eY, 2, eH, "#ffffff");   p(eX[1], eY, 2, eH, "#ffffff");
+    p(eX[0], eY+eH-1, 1, 1, "#2a2320"); p(eX[1]+1, eY+eH-1, 1, 1, "#2a2320");
   } else {
-    p(5,6,2,2,"#2a2320");  p(9,6,2,2,"#2a2320");
-    p(6,6,1,1,"#ffffff");  p(10,6,1,1,"#ffffff");
+    p(eX[0], eY, 2, eH, "#2a2320");   p(eX[1], eY, 2, eH, "#2a2320");
+    p(eX[0]+1, eY, 1, 1, "#ffffff");  p(eX[1]+1, eY, 1, 1, "#ffffff");
   }
-  p(7,8,2,1, sp.beak || "#2a2320");
-  if(stageId==="baby"){ p(4,8,1,1,"#f4a0ac"); p(11,8,1,1,"#f4a0ac"); }
-  if(stageId==="adult"){ p(7,10,2,1,"#f3bb35"); p(6,10,1,1,"#e05549"); p(9,10,1,1,"#e05549"); }
+  p(7, S.muzY, 2, 1, sp.beak || "#2a2320");
+
+  if(stageId==="baby"){                         /* 볼터치 */
+    p(hx, S.muzY, 1, 1, "#f4a0ac"); p(hx+hw-1, S.muzY, 1, 1, "#f4a0ac");
+  }
+  if(stageId==="adult"){                        /* 나비넥타이 */
+    p(7, by, 2, 1, "#f3bb35"); p(6, by, 1, 1, "#e05549"); p(9, by, 1, 1, "#e05549");
+  }
 }
 function creature(key, stageId, cssPx){
   var sp = SPECIES[key]; if(!sp) sp = SPECIES.cat;
@@ -752,6 +798,12 @@ function fmtH(u){
   return (v%1===0) ? String(v) : v.toFixed(1);
 }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+/* 아직 오지 않은 시간에는 브릭을 끼울 수 없다.
+   지금 지나는 중인 10분 칸까지만 허용한다(그 칸이 '방금'이므로). */
+function maxEnd(){
+  return (viewDate === todayKey()) ? Math.min(SLOTS, nowSlot()+1) : SLOTS;
+}
+function maxStart(){ return maxEnd() - 1; }
 function nowSlot(){ var n=new Date(); return Math.floor((n.getHours()*60+n.getMinutes())/UNIT_MIN); }
 
 /* ─── 상태 + 저장소 ───────────────────────────── */
@@ -954,6 +1006,7 @@ function render(){
   }
 
   var ns = isToday ? nowSlot() : -1;
+  var lastOpen = maxEnd() - 1;
   var plate = document.getElementById("plate");
   var html = "";
   for(var hh=0;hh<24;hh++){
@@ -964,8 +1017,10 @@ function render(){
     while(q < PER_HOUR){
       var sl = base+q, en = map[sl];
       if(!en){
-        html += '<button type="button" class="seg'+(sl===ns?" nowcell":"")+'" style="--n:1"'+
-                ' data-slot="'+sl+'" aria-label="'+slotLabel(sl)+' 비어 있음"></button>';
+        var fut = (sl > lastOpen);
+        html += '<button type="button" class="seg'+(sl===ns?" nowcell":"")+(fut?" future":"")+'"'+
+                (fut?' disabled':'')+' style="--n:1" data-slot="'+sl+'"'+
+                ' aria-label="'+slotLabel(sl)+(fut?" 아직 오지 않은 시간":" 비어 있음")+'"></button>';
         q++;
       } else {
         var run = 1;
@@ -1187,15 +1242,15 @@ function focusMemo(){
 
 /* 한쪽을 옮기면 반대쪽이 길이를 지킨 채 따라온다 */
 function applySlot(w, i){
-  var span = Math.max(1, draft.e - draft.s);
+  var span = Math.max(1, draft.e - draft.s), top = maxEnd();
   if(w==="s"){
-    draft.s = i;
-    if(draft.e <= i) draft.e = Math.min(SLOTS, i + span);
-    if(draft.e <= draft.s) draft.s = Math.max(0, draft.e - 1);
+    draft.s = Math.min(i, top - 1);
+    if(draft.e <= draft.s) draft.e = Math.min(top, draft.s + span);
+    if(draft.e <= draft.s) draft.e = draft.s + 1;
   } else {
-    draft.e = i;
-    if(draft.s >= i) draft.s = Math.max(0, i - span);
-    if(draft.e <= draft.s) draft.e = Math.min(SLOTS, draft.s + 1);
+    draft.e = Math.min(i, top);
+    if(draft.s >= draft.e) draft.s = Math.max(0, draft.e - span);
+    if(draft.e <= draft.s) draft.e = Math.min(top, draft.s + 1);
   }
 }
 function timeCtl(w, slot){
@@ -1212,16 +1267,20 @@ function pickerHTML(w){
   if(viewDate===todayKey()) h += '<button type="button" class="mini" data-sl="'+w+':now">지금</button>';
   h += '<button type="button" class="mini" data-pick="">닫기</button></span></div>';
 
+  var top = maxEnd();
   h += '<div class="pkrow">시</div><div class="pkgrid" id="pkgrid">';
   for(i=0;i<=maxH;i++){
-    h += '<button type="button" data-sh="'+w+':'+i+'" aria-pressed="'+(i===ch)+'">'+
-         String(i).padStart(2,"0")+'</button>';
+    var hOff = (w==="s") ? (i*PER_HOUR > top-1)
+                         : ((i===24 ? SLOTS : i*PER_HOUR+1) > top);
+    h += '<button type="button" data-sh="'+w+':'+i+'"'+(hOff?' disabled':'')+
+         ' aria-pressed="'+(i===ch && !hOff)+'">'+String(i).padStart(2,"0")+'</button>';
   }
   h += '</div>';
 
   h += '<div class="pkrow">분</div><div class="pkmin">';
   for(i=0;i<PER_HOUR;i++){
-    var off = (ch===24 && i>0);
+    var sl = ch*PER_HOUR + i;
+    var off = (ch===24 && i>0) || ((w==="s") ? (sl > top-1) : (sl < 1 || sl > top));
     h += '<button type="button" data-sm="'+w+':'+i+'"'+(off?' disabled':'')+
          ' aria-pressed="'+(i===cm && !off)+'">'+String(i*UNIT_MIN).padStart(2,"0")+'</button>';
   }
@@ -1308,6 +1367,8 @@ function onSheetClick(ev){
   if(t.id === "btnDel"){ dropEntry(viewDate, draft.id); closeSheet(); renderAll(); return; }
   if(t.id === "btnSave"){
     syncMemo();
+    var cap = maxEnd();
+    if(draft.e > cap){ draft.e = cap; if(draft.s >= draft.e) draft.s = Math.max(0, draft.e-1); }
     putEntry(viewDate, {id:draft.id, s:draft.s, e:draft.e, cat:draft.cat, memo:(draft.memo||"").trim()});
     closeSheet(); renderAll(); return;
   }
@@ -1319,7 +1380,7 @@ function onSheetClick(ev){
     if(a==="s-") draft.s = Math.max(0, draft.s-1);
     if(a==="s+") draft.s = Math.min(draft.e-1, draft.s+1);
     if(a==="e-") draft.e = Math.max(draft.s+1, draft.e-1);
-    if(a==="e+") draft.e = Math.min(SLOTS, draft.e+1);
+    if(a==="e+") draft.e = Math.min(maxEnd(), draft.e+1);
     renderSheet(); return;
   }
   if(el.hasAttribute("data-pick")){
@@ -1353,9 +1414,9 @@ function onSheetClick(ev){
     var L = +el.getAttribute("data-len");
     if(draft.anchor === "e"){
       draft.s = Math.max(0, draft.e - L);
-      if(draft.e - draft.s < L) draft.e = Math.min(SLOTS, draft.s + L);
+      if(draft.e - draft.s < L) draft.e = Math.min(maxEnd(), draft.s + L);
     } else {
-      draft.e = Math.min(SLOTS, draft.s + L);
+      draft.e = Math.min(maxEnd(), draft.s + L);
       if(draft.e - draft.s < L) draft.s = Math.max(0, draft.e - L);
     }
     renderSheet(); return;
@@ -1436,6 +1497,7 @@ var suppressClick = false;
 var gest = null;
 var HOLD_MS = 240, MOVE_TOL = 12;
 
+function clampSlot(sl){ return Math.min(sl, maxStart()); }
 function slotAt(x, y){
   var el = document.elementFromPoint(x, y);
   var row = (el && el.closest) ? el.closest(".hour") : null;
@@ -1446,7 +1508,7 @@ function slotAt(x, y){
   var r = cells.getBoundingClientRect();
   var k = Math.floor((x - r.left) / (r.width / PER_HOUR));
   k = Math.max(0, Math.min(PER_HOUR-1, k));
-  return (+row.getAttribute("data-h")) * PER_HOUR + k;
+  return clampSlot((+row.getAttribute("data-h")) * PER_HOUR + k);
 }
 function paintSel(a, b){
   for(var i=0;i<ovlCells.length;i++){
@@ -1540,6 +1602,7 @@ document.getElementById("plate").addEventListener("click", function(ev){
     if(s>=d.entries[i].s && s<d.entries[i].e){ hit=d.entries[i]; break; }
   }
   if(hit){ openSheet({id:hit.id, s:hit.s, e:hit.e, cat:hit.cat, memo:hit.memo}); return; }
+  if(s > maxStart()) return;                /* 아직 오지 않은 시간 */
   openSheet({s:s, e:s+1});   /* 누른 10분 한 칸. 더 긴 시간은 드래그로 */
 });
 
@@ -1591,13 +1654,15 @@ renderAll();
 setTimeout(scrollToNow, 60);
 connect();
 
-/* 자정을 넘기면 날짜를 따라간다 */
+/* 10분이 지날 때마다 '여기까지' 선을 옮긴다 */
+var lastTick = nowSlot();
 setInterval(function(){
-  if(tab==="log" && viewDate!==todayKey() && draft===null){
-    var d=document.getElementById("dateLabel");
-    if(d) d.title = "오늘: "+todayKey();
-  }
-}, 60000);
+  var n = nowSlot();
+  if(n === lastTick) return;
+  lastTick = n;
+  if(draft) return;                       /* 입력 중에는 건드리지 않는다 */
+  if(tab === "log" && viewDate === todayKey()) render();
+}, 20000);
 
 })();
 </script>
