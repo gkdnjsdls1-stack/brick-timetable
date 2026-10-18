@@ -1367,8 +1367,13 @@ function onSheetClick(ev){
   if(t.id === "btnDel"){ dropEntry(viewDate, draft.id); closeSheet(); renderAll(); return; }
   if(t.id === "btnSave"){
     syncMemo();
+    /* 상한은 새로 만드는 기록에만 건다. 예전 버전에서 미리 찍어둔 미래 브릭을
+       열었다가 저장했다는 이유만으로 시간이 잘려나가면 안 된다. */
     var cap = maxEnd();
-    if(draft.e > cap){ draft.e = cap; if(draft.s >= draft.e) draft.s = Math.max(0, draft.e-1); }
+    if(!draft.editing && draft.e > cap){
+      draft.e = cap;
+      if(draft.s >= draft.e) draft.s = Math.max(0, draft.e-1);
+    }
     putEntry(viewDate, {id:draft.id, s:draft.s, e:draft.e, cat:draft.cat, memo:(draft.memo||"").trim()});
     closeSheet(); renderAll(); return;
   }
