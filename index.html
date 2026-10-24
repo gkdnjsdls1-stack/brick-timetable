@@ -317,10 +317,12 @@ button{cursor:pointer}
   font-variant-numeric:tabular-nums}
 
 .setrow{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
   background:var(--panel);border-radius:3px;padding:11px 13px;box-shadow:0 3px 0 var(--shadow);
 }
-.setrow .lbl{font-size:14px}
+.setrow + .setrow{margin-top:8px}
+.setrow .lbl{font-size:14px;min-width:0;flex:1 1 150px}
+.setrow .stepper .mini{width:auto;height:auto;white-space:nowrap;padding:8px 12px}
 .setrow .lbl small{display:block;color:var(--mute);font-size:12px}
 .stepper{display:flex;align-items:center;gap:8px;flex:none}
 .stepper button{
@@ -464,6 +466,12 @@ button{cursor:pointer}
 .chip[aria-pressed="true"][data-ink="dark"]{color:var(--ink)}
 .chip:active{transform:translateY(2px);box-shadow:0 1px 0 var(--shadow)}
 .chip[aria-pressed="true"]:active{box-shadow:0 1px 0 rgba(0,0,0,.26)}
+.bkbox{
+  width:100%;min-height:150px;resize:vertical;border:0;border-radius:3px;
+  background:var(--plate);color:var(--ink);padding:11px 12px;font-size:12px;line-height:1.5;
+  font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-all;
+  box-shadow:inset 0 2px 0 rgba(0,0,0,.1);
+}
 .sheet input[type=text]{
   width:100%;padding:11px 12px;border:0;border-radius:3px;background:var(--plate);
   box-shadow:inset 0 2px 0 rgba(0,0,0,.1);
@@ -575,6 +583,17 @@ button{cursor:pointer}
           <button type="button" id="goalMinus" aria-label="목표 줄이기">-</button>
           <span class="val" id="goalVal">6</span>
           <button type="button" id="goalPlus" aria-label="목표 늘리기">+</button>
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="lbl">저장소<small id="persistSub">확인 중…</small></div>
+        <div class="stepper"><button type="button" class="mini" id="persistBtn">영구 저장 켜기</button></div>
+      </div>
+      <div class="setrow">
+        <div class="lbl">백업<small>기록을 글자로 뽑아 두면 날아가도 되살릴 수 있어요</small></div>
+        <div class="stepper">
+          <button type="button" class="mini" id="bkOut">내보내기</button>
+          <button type="button" class="mini" id="bkIn">불러오기</button>
         </div>
       </div>
       <p class="note" id="syncNote">저장 위치 확인 중…</p>
@@ -933,6 +952,88 @@ function saveDay(k){
     pending[k]=false;
     DB.doc("days/"+k).set(JSON.parse(JSON.stringify(S.days[k])))["catch"](function(){});
   }, 120);
+}
+
+/* 브라우저는 '영구 저장' 허가를 받지 않은 사이트의 저장소를 주기적으로 비운다.
+   특히 iOS 사파리가 그렇다. 그래서 켤 수 있으면 켜 둔다. */
+function setPersistNote(t){ var el=document.getElementById("persistSub"); if(el) el.textContent=t; }
+
+function refreshPersist(ask){
+  var btn = document.getElementById("persistBtn");
+  if(!navigator.storage || !navigator.storage.persist){
+    setPersistNote("이 브라우저는 영구 저장을 지원하지 않아요. 백업을 받아 두세요.");
+    if(btn) btn.hidden = true;
+    return Promise.resolve(false);
+  }
+  var step = ask ? navigator.storage.persist() : navigator.storage.persisted();
+  return step.then(function(granted){
+    if(granted){
+      setPersistNote("켜짐 — 브라우저가 기록을 함부로 비우지 않습니다");
+      if(btn) btn.hidden = true;
+    } else {
+      setPersistNote(ask ? "브라우저가 거절했어요. 백업을 꼭 받아 두세요."
+                         : "꺼짐 — 브라우저가 기록을 비울 수 있어요");
+      if(btn) btn.hidden = false;
+    }
+    return granted;
+  })["catch"](function(){
+    setPersistNote("상태를 알 수 없어요. 백업을 받아 두세요.");
+    return false;
+  });
+}
+
+function backupText(){
+  return JSON.stringify({app:"brick-timetable", at:new Date().toISOString(), state:S});
+}
+function openBackup(mode){
+  var out = (mode === "out");
+  var host = document.getElementById("modalHost");
+  host.innerHTML = '<div class="scrim" id="bkScrim"><div class="sheet" role="dialog" aria-modal="true">'+
+    '<h2>'+(out ? "기록 내보내기" : "기록 불러오기")+'</h2>'+
+    '<div class="fld"><label>'+(out
+      ? "아래 글자를 통째로 복사해서 메모장이나 메일에 붙여 두세요"
+      : "백업해 둔 글자를 여기에 붙여넣으세요")+'</label>'+
+    '<textarea id="bkText" class="bkbox" spellcheck="false"'+(out?' readonly':'')+
+    ' placeholder="'+(out?"":"{\"app\":\"brick-timetable\" …")+'"></textarea></div>'+
+    '<p class="hint" id="bkMsg"></p>'+
+    '<div class="acts">'+
+      '<button type="button" class="cancel" id="bkClose">닫기</button>'+
+      (out ? '<button type="button" class="save" id="bkCopy">복사</button>'
+           : '<button type="button" class="save" id="bkDo">되살리기</button>')+
+    '</div></div></div>';
+
+  var ta = document.getElementById("bkText");
+  if(out){
+    ta.value = backupText();
+    ta.focus(); ta.select();
+  }
+  var msg = document.getElementById("bkMsg");
+  document.getElementById("bkScrim").addEventListener("click", function(ev){
+    if(ev.target.id === "bkScrim" || ev.target.id === "bkClose"){ host.innerHTML = ""; return; }
+    if(ev.target.id === "bkCopy"){
+      ta.select();
+      var done = function(){ msg.textContent = "복사했어요. 안전한 곳에 붙여 두세요."; };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(ta.value).then(done)["catch"](function(){
+          msg.textContent = "복사가 막혔어요. 글자를 직접 선택해 복사하세요.";
+        });
+      } else { done(); }
+      return;
+    }
+    if(ev.target.id === "bkDo"){
+      var v;
+      try { v = JSON.parse(ta.value); } catch(e){ msg.textContent = "글자가 깨졌어요. 다시 붙여넣어 보세요."; return; }
+      var st = v && v.state ? v.state : v;
+      if(!st || !st.profile || !st.days){ msg.textContent = "이 앱의 백업이 아닌 것 같아요."; return; }
+      S.profile = st.profile; S.days = st.days;
+      ensureCats(); migrate();
+      lsSave(); persistAll();
+      host.innerHTML = "";
+      renderAll();
+      toast("기록을 되살렸어요", false);
+      return;
+    }
+  });
 }
 
 function setSyncNote(t){ var el=document.getElementById("syncNote"); if(el) el.textContent=t; }
@@ -1716,6 +1817,10 @@ document.getElementById("todayBtn").addEventListener("click", function(){
 document.getElementById("goalMinus").addEventListener("click", function(){
   S.profile.goal = Math.max(3, S.profile.goal-3); saveProfile(); render(); renderStats();
 });
+document.getElementById("persistBtn").addEventListener("click", function(){ refreshPersist(true); });
+document.getElementById("bkOut").addEventListener("click", function(){ openBackup("out"); });
+document.getElementById("bkIn").addEventListener("click", function(){ openBackup("in"); });
+
 document.getElementById("goalPlus").addEventListener("click", function(){
   S.profile.goal = Math.min(SLOTS, S.profile.goal+3); saveProfile(); render(); renderStats();
 });
@@ -1747,6 +1852,7 @@ lsLoad();
 if(migrate()) lsSave();
 ensureCats();
 renderAll();
+refreshPersist(false).then(function(ok){ if(!ok) return refreshPersist(true); });
 setTimeout(scrollToNow, 60);
 connect();
 
